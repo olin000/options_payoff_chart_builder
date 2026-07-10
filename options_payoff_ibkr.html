@@ -108,8 +108,13 @@ body{background:#1a1a1a;font-family:'Courier New',monospace;font-size:13px;color
 .dte-badge{font-size:11px;padding:2px 7px;border-radius:3px;background:#111;border:.5px solid #444;color:#d4d4d0;display:flex;align-items:center;gap:4px}
 .dte-row{display:flex;align-items:center;gap:10px}
 .dte-row label{font-size:11px;color:#a8a7a0;min-width:56px}
+.dte-slider-wrap{position:relative;flex:1}
 .dte-slider{flex:1;accent-color:#888;cursor:pointer;height:4px}
-.dte-slider:disabled{opacity:.3;cursor:not-allowed}
+.dte-slider{width:100%;accent-color:#888;cursor:pointer;height:4px}
+.dte-0dte-marker{position:absolute;top:50%;left:80%;width:1px;height:10px;background:#555;transform:translateY(-50%);pointer-events:none}
+.dte-0dte-marker::after{content:'0DTE';position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:9px;color:#555}
+.dte-slider-wrap:not(.enabled) .dte-0dte-marker{display:none}
+.dte-info{font-size:12px;font-weight:500;color:#d4d4d0;min-width:160px;text-align:right}
 .dte-info{font-size:12px;font-weight:500;color:#d4d4d0;min-width:160px;text-align:right}
 
 /* ── IV section ── */
@@ -261,7 +266,10 @@ body{background:#1a1a1a;font-family:'Courier New',monospace;font-size:13px;color
     </div>
     <div class="dte-row">
       <label>time</label>
-      <input type="range" class="dte-slider" id="dteSlider" min="0" max="1000" value="1000" step="1" oninput="onDteScrub()" disabled>
+      <div class="dte-slider-wrap" id="dteSliderWrap">
+        <input type="range" class="dte-slider" id="dteSlider" min="0" max="1000" value="1000" step="1" oninput="onDteScrub()" disabled>
+        <div class="dte-0dte-marker"></div>
+      </div>
       <span class="dte-info" id="dteInfo">— add expiry to legs</span>
     </div>
   </div>
@@ -722,12 +730,11 @@ function msToSliderStep(ms, sliderMaxMs, totalDays){
 }
 
 function rebuildSlider(){
-  const slider=document.getElementById('dteSlider'), info=document.getElementById('dteInfo');
+  const slider=document.getElementById('dteSlider'), info=document.getElementById('dteInfo'), wrap=document.getElementById('dteSliderWrap');
   const expiries=options.filter(o=>o.enabled&&o.expiry).map(o=>parseDate(o.expiry)).filter(Boolean);
-  if(!expiries.length){ slider.disabled=true;viewDateMs=null;sliderMinMs=null;sliderMaxMs=null;info.textContent='— add expiry to legs';return; }
+  if(!expiries.length){ slider.disabled=true;wrap.classList.remove('enabled');viewDateMs=null;sliderMinMs=null;sliderMaxMs=null;info.textContent='— add expiry to legs';return; }
   const t0=today0(); sliderMinMs=t0; sliderMaxMs=Math.max(...expiries);
-  const totalDays=Math.max(1, daysBetween(sliderMinMs,sliderMaxMs));
-  slider.disabled=false; slider.min=0; slider.max=SLIDER_STEPS; slider.step=1;
+  const totalDays=Math.max(1, daysBetween(sliderMinMs,sliderMaxMs)); slider.disabled=false; wrap.classList.add('enabled'); slider.min=0; slider.max=SLIDER_STEPS; slider.step=1;
   if(viewDateMs===null||viewDateMs<sliderMinMs||viewDateMs>sliderMaxMs+86400000){
     viewDateMs=sliderMinMs; slider.value=0;
   } else {
