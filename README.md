@@ -50,8 +50,9 @@ _The included `ibkr_proxy_start.bat` already launches the proxy with delayed dat
 ## Features
 
 - Syncs directly with IBKR portfolio and retrieves exact positions and average cost bases.
-- Gracefully attempts to pull Implied Volatility even when the market is closed (frozen data).
-- Interactive crosshair showing precise payoff expectations on both the expiration curve and the time-adjusted Black-Scholes curve.
+- Gracefully attempts to pull Implied Volatility even when the market is closed (using frozen data).
+- Interactive crosshair showing precise payoff expectations on both the expiration curve and the time-adjusted and IV-adjusted Black-Scholes curve.
+- Master volatility slider for "what-if" analysis on vega exposure.
 - Export/Import portfolio layouts to JSON.
 - Manually add custom option legs and underlying positions to test hypothetical trades.
 

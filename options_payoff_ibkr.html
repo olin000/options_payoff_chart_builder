@@ -112,6 +112,18 @@ body{background:#1a1a1a;font-family:'Courier New',monospace;font-size:13px;color
 .dte-slider:disabled{opacity:.3;cursor:not-allowed}
 .dte-info{font-size:12px;font-weight:500;color:#d4d4d0;min-width:160px;text-align:right}
 
+/* ── IV section ── */
+.iv-section{background:#111;border:.5px solid #3a3a3a;border-radius:6px;padding:10px 12px;margin-bottom:1.25rem}
+.iv-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+.iv-title{font-size:11px;letter-spacing:.08em;color:#a8a7a0;text-transform:uppercase}
+.iv-row{display:flex;align-items:center;gap:10px}
+.iv-check-group{display:flex;align-items:center;gap:6px}
+.iv-row label{font-size:11px;color:#a8a7a0;min-width:56px}
+.iv-row label.check-label{min-width:auto;cursor:pointer}
+.iv-slider{flex:1;accent-color:#888;cursor:pointer;height:4px}
+.iv-slider:disabled{opacity:.3;cursor:not-allowed}
+.dte-info{font-size:12px;font-weight:500;color:#d4d4d0;min-width:160px;text-align:right}
+
 /* ── leg tables ── */
 .section{margin-bottom:1.25rem}
 .section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px}
@@ -254,6 +266,21 @@ body{background:#1a1a1a;font-family:'Courier New',monospace;font-size:13px;color
     </div>
   </div>
 
+  <!-- ── VOLATILITY SECTION ── -->
+  <div class="iv-section">
+    <div class="iv-header">
+      <span class="iv-title">volatility adjustment</span>
+      <div class="iv-check-group">
+        <input type="checkbox" id="ivOverrideCheck" onchange="onIvOverrideToggle()">
+        <label for="ivOverrideCheck" class="check-label">enable master IV override</label>
+      </div>
+    </div>
+    <div class="iv-row">
+      <label>master IV %</label>
+      <input type="range" class="iv-slider" id="ivSlider" min="0.1" max="200" value="30" step="0.1" oninput="onIvScrub()" disabled>
+      <span class="dte-info" id="ivInfo">30.0%</span>
+    </div>
+  </div>
   <!-- ── CHART ── -->
   <div class="chart-wrap" id="chartWrap" title="Scroll to zoom · drag to pan · double-click to reset">
     <canvas id="payoffChart"></canvas>
@@ -765,13 +792,32 @@ function bsPayoffAt(S){
     let val;
     if(expMs&&(o.iv||0)>0){
           const T=Math.max(0,(expMs+86400000-viewDateMs))/(365*86400000); // fractional years, ends at midnight of expiry day
-      val=bsPrice(S,o.strike,T,r,(o.iv)/100,o.type); anyBS=true;
+      const ivOverrideEnabled = document.getElementById('ivOverrideCheck').checked;
+      const ivSliderVal = parseFloat(document.getElementById('ivSlider').value);
+      const ivToUse = ivOverrideEnabled ? ivSliderVal : o.iv;
+      val=bsPrice(S,o.strike,T,r,ivToUse/100,o.type); anyBS=true;
     } else { val=o.type==='call'?Math.max(0,S-o.strike):Math.max(0,o.strike-S); }
     p+=o.pos*o.mult*(val-o.premium);
   }
   for(const u of underlyings){ if(!u.enabled) continue; p+=u.pos*u.mult*(S-u.entry); }
   return anyBS?p:null;
 }
+
+/* ═══════════════════════════════════════════════════════
+   VOLATILITY SLIDER
+═══════════════════════════════════════════════════════ */
+function onIvOverrideToggle(){
+  const isEnabled = document.getElementById('ivOverrideCheck').checked;
+  document.getElementById('ivSlider').disabled = !isEnabled;
+  updateChart();
+}
+
+function onIvScrub(){
+  const val = parseFloat(document.getElementById('ivSlider').value);
+  document.getElementById('ivInfo').textContent = val.toFixed(1) + '%';
+  updateChart();
+}
+
 
 /* ═══════════════════════════════════════════════════════
    BREAKEVENS + GRID
