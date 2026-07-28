@@ -4,10 +4,11 @@ A lightweight, browser-based options payoff visualizer that integrates directly 
 
 ## Architecture & Logic
 
-The tool is designed to be completely local and consists of two standalone components:
+The tool is designed to be completely local and consists of standalone components:
 
-1. **`ibkr_proxy.py`**: A Python Flask application that acts as a bridge between your web browser and IBKR. It uses `ibapi` to connect to TWS or IB Gateway, fetching your live portfolio positions and extracting real-time or frozen Implied Volatility (IV) for your options.
-2. **`options_payoff_ibkr.html`**: A single-page HTML application. It connects to the local proxy to import your positions, calculates theoretical option pricing using the Black-Scholes model, and renders the interactive payoff chart using Chart.js.
+1. **[ibkr_proxy.py](file:///k:/WIT/Python/options_payoff_chart_builder/ibkr_proxy.py)**: A Python Flask application that acts as a bridge via the **TWS Socket API** (`ibapi`). It connects to TWS or IB Gateway (default socket port `7497` paper / `7496` live).
+2. **[ibkr_proxy_rest.py](file:///k:/WIT/Python/options_payoff_chart_builder/ibkr_proxy_rest.py)**: A Python Flask application that acts as a bridge via the **IBKR Client Portal REST Gateway** (`clientportal.gw`). It connects to the local REST API endpoint (default `https://127.0.0.1:5000/v1/api`).
+3. **[options_payoff_ibkr.html](file:///k:/WIT/Python/options_payoff_chart_builder/options_payoff_ibkr.html)**: A single-page HTML application. It connects to the local proxy (listening on port `5001`) to import your positions, calculates theoretical option pricing using the Black-Scholes model, and renders the interactive payoff chart using Chart.js.
 
 ## How to Start
 
@@ -16,36 +17,34 @@ The tool is designed to be completely local and consists of two standalone compo
 Ensure you have Python installed, then install the required dependencies:
 
 ```bash
+# For TWS Socket API proxy:
 pip install ibapi flask flask-cors
+
+# For Client Portal REST API proxy:
+pip install requests flask flask-cors
 ```
 
-### 2. Configure IBKR TWS / Gateway
+### 2. Choose and Run Your Preferred Proxy
 
-In TWS or IB Gateway, navigate to **Settings > API > Settings**:
+Both proxies listen on local port `5001` and provide the exact same interface for `options_payoff_ibkr.html`.
 
-- Check **Enable ActiveX and Socket Clients**
-- Check **Allow connections from localhost only** (Recommended)
-- Note your Socket port (default is `7497` for TWS Paper trading, `4002` for Gateway Paper).
-
-### 3. Run the Proxy
-
-Start the Python proxy bridge. By default, it attempts to connect to TWS paper trading on port `7497` and serves the API on port `5001`.
+#### Option A: TWS / IB Gateway (Socket API)
+Configure TWS / IB Gateway (**Settings > API > Settings**: check *Enable ActiveX and Socket Clients*).
 
 ```bash
 python ibkr_proxy.py
+# or launch ibkr_proxy_start.bat
 ```
+*(Optional flags: `--tws-port 7496` for live TWS, `--tws-port 4001`/`4002` for Gateway, or `--market-data-type 1|2|3|4`.)*
 
-_(Optional flags: use `--tws-port 7496` for live TWS, or `--tws-port 4001`/`4002` for Gateway.)_
-
-_(You can also choose the IBKR market data type with `--market-data-type 1|2|3|4` where `1=Live`, `2=Frozen` (default), `3=Delayed`, and `4=Delayed frozen`.)_
-
-_For example, to use delayed data from IB Gateway:_
+#### Option B: Client Portal Gateway (REST API)
+Start the IBKR Client Portal Gateway (`clientportal.gw`) and log in at `https://localhost:5000`.
 
 ```bash
-python ibkr_proxy.py --tws-port 4001 --market-data-type 3
+python ibkr_proxy_rest.py
+# or launch ibkr_proxy_rest_start.bat
 ```
-
-_The included `ibkr_proxy_start.bat` already launches the proxy with delayed data via `--market-data-type 3`._
+*(Optional flags: `--gateway-url https://127.0.0.1:5000/v1/api`, `--proxy-port 5001`, `--no-ssl-verify`.)*
 
 ## Features
 
