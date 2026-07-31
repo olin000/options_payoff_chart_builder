@@ -154,11 +154,10 @@ class IBKRRestConnection:
                 return data[0].get("conid")
         return None
 
-    def get_market_data_snapshot(self, conids, fields="31,70,71,84,85,7283,7633,74"):
+    def get_market_data_snapshot(self, conids, fields="31,70,71,84,85,7283,7633,7284,7285,7311,74", max_wait=3.5):
         """
         Request market data snapshot for contract conids.
-        Field 31: Last Price, 70: High, 71: Low, 84: Bid, 85: Ask, 74: Und Price, 7283/7633: Implied Vol.
-        CP Gateway snapshot often requires an initial request to kick off subscriptions, followed by a second fetch.
+        Polls for up to max_wait seconds to allow Client Portal Gateway to subscribe & populate IV fields.
         """
         if isinstance(conids, (list, tuple)):
             conid_str = ",".join(str(c) for c in conids)
@@ -166,12 +165,35 @@ class IBKRRestConnection:
             conid_str = str(conids)
 
         url = f"/iserver/marketdata/snapshot?conids={conid_str}&fields={fields}"
-        r1 = self.req("GET", url)
-        time.sleep(0.3)
-        r2 = self.req("GET", url)
         
-        data = r2.json() if r2.status_code == 200 else (r1.json() if r1.status_code == 200 else [])
-        return data if isinstance(data, list) else []
+        # Initial call triggers subscription in Gateway cache
+        self.req("GET", url)
+        
+        deadline = time.monotonic() + max_wait
+        last_data = []
+
+        while time.monotonic() < deadline:
+            time.sleep(0.4)
+            r = self.req("GET", url)
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, list) and len(data) > 0:
+                    last_data = data
+                    # Check if IV field (7283, 7633, 7284, 7311, 7285) is populated
+                    has_iv = any(
+                        snap.get("7283") is not None or 
+                        snap.get("7633") is not None or 
+                        snap.get("7284") is not None or
+                        snap.get("7311") is not None or
+                        snap.get("7285") is not None
+                        for snap in data if isinstance(snap, dict)
+                    )
+                    if has_iv:
+                        elapsed = max_wait - (deadline - time.monotonic())
+                        print(f"  [REST IV] Market snapshot populated in {elapsed:.1f}s")
+                        return data
+
+        return last_data
 
 
 def parse_option_details(item):
@@ -429,8 +451,8 @@ def make_rest_app(gateway_url, account_id=None, ssl_verify=False):
             c_id = snap.get("conid")
             if c_id in conid_map:
                 key = conid_map[c_id]
-                # Field 7283 or 7633 = Implied Volatility
-                raw_iv = snap.get("7283") or snap.get("7633") or snap.get("7284")
+                # Field 7283, 7633, 7284, 7311, 7285 = Implied Volatility / Historical Volatility
+                raw_iv = snap.get("7283") or snap.get("7633") or snap.get("7284") or snap.get("7311") or snap.get("7285")
                 if raw_iv is not None:
                     try:
                         iv_val = float(str(raw_iv).replace("%", ""))

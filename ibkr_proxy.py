@@ -224,7 +224,7 @@ class IBKRConnection:
             time.sleep(0.3)
         return list(app.portfolio_items)
 
-    def fetch_iv(self, contracts, farm_wait=5, data_wait=10):
+    def fetch_iv(self, contracts, farm_wait=1.5, data_wait=8):
         """
         Subscribe to all contracts on the persistent connection.
         Strategy:
@@ -271,11 +271,10 @@ class IBKRConnection:
                     with app._iv_lock:
                         app._iv_data.pop(req, None)
                         app._iv_events[req] = ev
-                    # Requesting generic tick 106 (Impl Vol) with MarketDataType 2
-                    # (Frozen) is the most robust way to get IV off-hours.
+                    # Request generic ticks 106 (Impl Vol), 100 (Opt Vol), 101 (Opt OI), 104 (Hist Vol)
                     print(
                         f"  [sub] reqId={req} {opt.symbol} {opt.right} {opt.strike} {opt.lastTradeDateOrContractMonth}")
-                    app.reqMktData(req, opt, "106", False, False, [])
+                    app.reqMktData(req, opt, "106,100,101,104", False, False, [])
                     req_map[req] = (key, ev)
                     # Stagger slightly to avoid TWS model throttling
                     time.sleep(0.02)
