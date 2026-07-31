@@ -1106,7 +1106,7 @@ function updateOption(id,field,val){
     if(field==='symbol') val = val.trim().toUpperCase();
     o[field]=val; 
   } else o[field]=parseFloat(val)||0; 
-  if(field==='expiry') rebuildSlider(); if(field==='iv') renderOptions(); updateChart(); 
+  if(field==='expiry') rebuildSlider(); updateChart(); 
 }
 function updateUnderlying(id,field,val){ 
   const u=underlyings.find(u=>u.id===id); if(!u) return; 
@@ -1145,7 +1145,7 @@ function renderOptions(){
       <td class="opt-col-strike">${ni('strike',o.id,o.strike,'updateOption')}</td>
       <td class="opt-col-prem">${ni('premium',o.id,o.premium,'updateOption')}</td>
       <td class="opt-col-mult">${ni('mult',o.id,o.mult,'updateOption')}</td>
-      <td class="opt-col-iv"><input type="number" value="${o.iv||''}" step="0.1" placeholder="IV%" title="${o.iv?'':'IV not imported — enter manually to enable BS curve'}" style="font-family:inherit;font-size:12px;background:#0d0d0d;border:.5px solid ${o.iv?'#525250':'#8b4500'};border-radius:4px;color:${o.iv?'#d4d4d0':'#e8a020'};padding:4px 5px;width:100%;height:30px" oninput="updateOption(${o.id},'iv',this.value)"></td>
+      <td class="opt-col-iv"><input type="number" value="${o.iv||''}" step="0.1" placeholder="IV%" title="${o.iv?'':'IV not imported — enter manually to enable BS curve'}" style="font-family:inherit;font-size:12px;background:#0d0d0d;border:.5px solid ${o.iv?'#525250':'#8b4500'};border-radius:4px;color:${o.iv?'#d4d4d0':'#e8a020'};padding:4px 5px;width:100%;height:30px" oninput="updateOption(${o.id},'iv',this.value)" onchange="renderOptions()"></td>
       <td class="opt-col-exp">${di('expiry',o.id,o.expiry,'updateOption')}</td>
       <td class="opt-col-del"><button class="del-btn" onclick="removeOption(${o.id})">×</button></td>
     </tr>`).join('');
