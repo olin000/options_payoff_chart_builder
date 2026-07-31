@@ -19,6 +19,7 @@ Client Portal Gateway setup:
 """
 
 import argparse
+import re
 import sys
 import time
 import urllib3
@@ -173,6 +174,88 @@ class IBKRRestConnection:
         return data if isinstance(data, list) else []
 
 
+def parse_option_details(item):
+    """
+    Extract strike, right ('C'/'P'), and expiry ('YYYY-MM-DD') from position item.
+    Supports direct keys, OCC string regex, and human-readable description regex.
+    """
+    strike = 0.0
+    right = "C"
+    expiry_str = ""
+
+    # Direct numeric/string fields in item if present
+    if item.get("strike") is not None:
+        try:
+            s_val = float(item.get("strike"))
+            if s_val > 0:
+                strike = s_val
+        except (ValueError, TypeError):
+            pass
+
+    r_raw = item.get("right") or item.get("putOrCall") or item.get("optionType")
+    if r_raw and str(r_raw).strip():
+        right = str(r_raw).strip()[0].upper()
+
+    exp_raw = str(item.get("expiry") or item.get("lastTradingDay") or item.get("maturityDate") or "")
+    if len(exp_raw) == 8 and exp_raw.isdigit():
+        expiry_str = f"{exp_raw[:4]}-{exp_raw[4:6]}-{exp_raw[6:8]}"
+    elif len(exp_raw) == 10 and "-" in exp_raw:
+        expiry_str = exp_raw
+
+    # Collect text fields to search
+    text_fields = [
+        str(item.get("contractDesc") or ""),
+        str(item.get("ticker") or ""),
+        str(item.get("description") or ""),
+        str(item.get("symbol") or ""),
+        str(item.get("name") or ""),
+    ]
+    combined_text = " ".join(t for t in text_fields if t).strip()
+
+    # OCC Pattern (e.g. "PENG 260821P00045000" or "260821P00045000" or "PENG 260821C00030000 100")
+    occ_match = re.search(r'\b(\d{6})([CPcp])(\d{8})\b', combined_text)
+    if occ_match:
+        yymmdd = occ_match.group(1)
+        right_found = occ_match.group(2).upper()
+        strike_raw = occ_match.group(3)
+
+        if not expiry_str:
+            expiry_str = f"20{yymmdd[:2]}-{yymmdd[2:4]}-{yymmdd[4:6]}"
+        right = right_found
+        if strike == 0.0:
+            try:
+                strike = float(strike_raw) / 1000.0
+            except ValueError:
+                pass
+        return strike, right, expiry_str
+
+    # Human Readable Pattern (e.g. "AUG 21 '26 45.0 PUT", "21AUG26 45 PUT", "Aug21'26 45 P")
+    desc_match = re.search(r'\b([A-Za-z]{3})\s*(\d{1,2})\s*\'?(\d{2,4})\s+([\d\.]+)\s+(CALL|PUT|C|P)\b', combined_text, re.IGNORECASE)
+    if desc_match:
+        mon_str = desc_match.group(1).title()
+        day_str = desc_match.group(2).zfill(2)
+        year_str = desc_match.group(3)
+        if len(year_str) == 2:
+            year_str = "20" + year_str
+        strike_val = desc_match.group(4)
+        r_val = desc_match.group(5)[0].upper()
+
+        if not expiry_str:
+            try:
+                dt = datetime.strptime(f"{mon_str} {day_str} {year_str}", "%b %d %Y")
+                expiry_str = dt.strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+        right = r_val
+        if strike == 0.0:
+            try:
+                strike = float(strike_val)
+            except ValueError:
+                pass
+
+    return strike, right, expiry_str
+
+
 def classify_rest_items(items):
     """Normalize Client Portal Gateway position objects into Payoff Builder format."""
     options_out = []
@@ -204,30 +287,7 @@ def classify_rest_items(items):
         conid = item.get("conid")
 
         if sec_type == "OPT":
-            right = (item.get("right") or item.get("putOrCall") or "C")[0].upper()
-            strike = float(item.get("strike", 0))
-            
-            exp_raw = str(item.get("expiry") or item.get("lastTradingDay") or "")
-            
-            # Fallback OCC parsing if strike or expiry missing
-            ticker_str = (item.get("ticker") or item.get("contractDesc") or "").strip()
-            parts = ticker_str.split()
-            if len(parts) >= 2 and len(parts[1]) >= 15:
-                occ = parts[1]  # e.g. "260731P00089000"
-                if not exp_raw:
-                    yymmdd = occ[:6]
-                    exp_raw = f"20{yymmdd[:2]}{yymmdd[2:4]}{yymmdd[4:6]}"
-                if strike == 0:
-                    right = occ[6].upper()
-                    try:
-                        strike = float(occ[7:]) / 1000.0
-                    except ValueError:
-                        pass
-
-            if len(exp_raw) == 8:
-                expiry_str = f"{exp_raw[:4]}-{exp_raw[4:6]}-{exp_raw[6:8]}"
-            else:
-                expiry_str = exp_raw
+            strike, right, expiry_str = parse_option_details(item)
 
             try:
                 mult = int(item.get("multiplier", 100))
